@@ -48,11 +48,61 @@
 -- @license Apache
 -- @copyright Adam Grandquist 2016
 
+local ltn12 = require('ltn12')
+
 local m = {}
 
 local DEFAULT_BUCKET_NAME = 'fs'
 local DEFAULT_CHUNK_SIZE_BYTES = 1024 * 255
 local DEFAULT_CONCURRENCY = 10
+
+local function filter_chunk_low(chunk, data, chunk_size_bytes)
+  if not chunk then
+    if string.len(data) < chunk_size_bytes then
+      return data
+    end
+  else
+    data = data .. chunk
+  end
+  if string.len(data) >= chunk_size_bytes then
+    chunk = string.sub(data, 1, chunk_size_bytes)
+    data = string.sub(data, chunk_size_bytes)
+  else
+    chunk = ''
+  end
+  return chunk, data
+end
+
+local function filter_chunk(chunk_size_bytes)
+  return ltn12.filter.cycle(filter_chunk_low, '', chunk_size_bytes)
+end
+
+local function sink_chunk(file_id, chunk_size_bytes, filest, chunkst)
+  local state = {
+    file_id = file_id,
+    num = 0,
+  }
+
+  local function sink(chunk, err)
+    if not chunk then
+      if err then
+        return nil, err
+      end
+      return filest.get(file_id).update().run()
+    end
+    if chunk == '' then return true end
+
+    state.data = chunk
+
+    chunkst.insert(state).run()
+
+    state.num = state.num + 1
+
+    return true
+  end
+
+  return ltn12.sink.chain(filter_chunk(chunk_size_bytes), sink)
+end
 
 function m.init(r)
   --- new ReGrid(connectionOptions, bucketOptions)
@@ -84,10 +134,20 @@ function m.init(r)
     local concurrency = bucket_options.concurrency or DEFAULT_CONCURRENCY
 
     if not r.type(connection_options) then
-      connection_options = r.connector(connection_options)
+      local err
+      connection_options, err = r.connector(connection_options)
+      connection_options.concurrency = concurrency  -- @todo
+      if not connection_options then
+        return nil, err
+      end
     end
 
-    local bucket = {}
+    local filesn = r.reql.add(bucket_name, '_files')
+    local filest = filesn.table()
+    local chunksn = r.reql.add(bucket_name, '_chunks')
+    local chunkst = chunksn.table()
+
+    local bucket = {r = r}
 
     --- bucket.initBucket()
     --
@@ -118,24 +178,48 @@ function m.init(r)
     -- The driver MUST check whether the indexes already exist before creating
     -- them. If creating the indexes fails the driver MUST return an error.
     function bucket.init_bucket()
-      local files = r.reql.add(bucket_name, '_files')
-      local chunks = r.reql.add(bucket_name, '_chunks')
-      files.table_create().run(connection_options, {noreply = true})
-      chunks.table_create().run(connection_options, {noreply = true})
-      files = files.table()
-      chunks = chunks.table()
-      assert(files.wait().run(connection_options).to_array())
-      assert(chunks.wait().run(connection_options).to_array())
-      files.index_create(
-        'file_ix',
-        function(row)
-          return {row'status', row'filename', row'finishedAt'}
-        end).run(connection_options, {noreply = true})
-      chunks.index_create(
-        'chunk_ix',
-        function(row)
-          return {row'file_id', row'num'}
-        end).run(connection_options, {noreply = true})
+      filesn.table_create().run(connection_options, {noreply = true})
+      chunksn.table_create().run(connection_options, {noreply = true})
+      filest.wait()'ready'.eq(1).branch(
+        filest.index_create(
+          'file_ix',
+          function(row)
+            return {row'status', row'filename', row'finishedAt'}
+          end
+        )
+      ).run(connection_options, {noreply = true})
+      chunkst.wait()'ready'.eq(1).branch(
+        chunkst.index_create(
+          'chunk_ix',
+          function(row)
+            return {row'file_id', row'num'}
+          end
+        )
+      ).run(connection_options, {noreply = true})
+      local cur, err = filest.index_wait'file_ix''ready'.run(connection_options)
+      if not cur then
+        return nil, err
+      end
+      local arr
+      arr, err = cur.to_array()
+      if not arr then
+        return nil, err
+      end
+      if not arr[1] then
+        return nil, 'file index not ready.'
+      end
+      cur, err = chunkst.index_wait'chunk_ix''ready'.run(connection_options)
+      if not cur then
+        return nil, err
+      end
+      arr, err = cur.to_array()
+      if not arr then
+        return nil, err
+      end
+      if not arr[1] then
+        return nil, 'chunk index not ready.'
+      end
+      return true
     end
 
     --- bucket.createWriteStream(filename, options)
@@ -153,12 +237,38 @@ function m.init(r)
     --
     -- bucket.createWriteStream(filename, options) // returns a stream
     function bucket.create_write_stream(filename, options)
+      local cur, err = filest.insert{
+        chunkSizeBytes = options.chunk_size_bytes or chunk_size_bytes,
+        startedAt = r.reql.now(),
+        filename = filename,
+        status = 'Incomplete',
+        metadata = options.metadata
+      }.run(connection_options)
+
+      if not cur then
+        return nil, err
+      end
+
+      local arr
+      arr, err = cur.to_array()
+
+      if not arr then
+        return nil, err
+      end
+
+      local file_id = arr[1].generated_keys[1]
+
+      return sink_chunk(file_id, chunk_size_bytes, filest, chunkst)
     end
 
     --- createReadStreamById(file_id)
     --
     -- Get a readStream by id
     function bucket.create_read_stream_by_id(file_id)
+      local function source()
+      end
+
+      return source()
     end
 
     --- createReadStreamByFilename(filename, options)
@@ -167,6 +277,10 @@ function m.init(r)
     -- be multiple "revisions" of a file. A user may optionally specify a
     -- revision in the options object.
     function bucket.create_read_stream_by_filename(filename, options)
+      local function source()
+      end
+
+      return source()
     end
 
     return bucket
