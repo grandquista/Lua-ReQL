@@ -265,6 +265,23 @@ function m.init(r)
     --
     -- Get a readStream by id
     function bucket.create_read_stream_by_id(file_id)
+      local cur, err = filest.get(file_id)
+
+      if not cur then
+        return nil, err
+      end
+
+      local arr
+      arr, err = cur.to_array()
+
+      if not arr then
+        return nil, err
+      end
+
+      if arr[1].status ~= 'Complete' then
+        return nil, 'Attempted to read ' .. string.lower(arr[1].status) .. ' file.'
+      end
+
       local function source()
       end
 
