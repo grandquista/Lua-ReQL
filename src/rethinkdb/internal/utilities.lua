@@ -35,6 +35,10 @@ function m.init(r, driver_options)
   r.socket = driver_options.socket or socket
 
   r.tcp = driver_options.tcp or r.socket.tcp
+
+  if driver_options.grid then
+    require'rethinkdb.grid'.init(r)
+  end
 end
 
 return m
