@@ -1,53 +1,71 @@
-from sys import argv, stderr, float_info
-import sys
-from upstream.parsePolyglot import parseYAML
-from os import walk
-from os.path import join
-from re import sub, match, split, DOTALL
-from collections import namedtuple
-import ast
+#!/usr/bin/env python
+"""yaml_to_lua."""
 
-verbosity = 1
+import ast
+import sys
+
+from collections import namedtuple
+from re import sub, match, split, DOTALL
+from sys import argv, float_info
+from upstream.parsePolyglot import parseYAML
+
+# == globals
 
 try:
     NameConstant = ast.NameConstant
 except:
-    NameConstant = lambda a: a
+    def NameConstant(a):
+        """NameConstant."""
+        return a
 
-class Discard(Exception):
-    pass
-
-class Unhandled(Exception):
-    pass
+verbosity = 1
 
 failed = False
 
 Ctx = namedtuple('Ctx', ['vars', 'context', 'type'])
 
+# ==
+
+
+class Discard(Exception):
+    """Discard."""
+
+
+class Unhandled(Exception):
+    """Unhandled."""
+
+
 def convert(python, prec, file, type):
+    """convert."""
     try:
         expr = ast.parse(python, filename=file, mode='eval').body
         cxx = to_cxx(expr, prec, Ctx(vars=[], type=type, context=None))
         return sub('" \\+ "', '', cxx)
     except (Unhandled, AssertionError):
-        print("While translating: " + python, file=stderr)
+        print("While translating: " + python)  # stderr
         raise
     except SyntaxError as e:
         raise Unhandled("syntax error: " + str(e) + ": " + repr(python))
 
+
 def py_str(py):
+    """py_str."""
     def maybe_unstr(s):
         if '(' in s:
             return s
         else:
             return repr(s)
     if type(py) is dict:
-        return '{' + ', '.join([repr(k) + ': ' + maybe_str(py[k]) for k in py]) + '}'
+        return '{{{}}}'.format(
+            ', '.join([repr(k) + ': ' + maybe_unstr(py[k]) for k in py])
+        )
     if not isinstance(py, "".__class__):
             return repr(py)
     return py
 
+
 def rename(id):
+    """rename."""
     return {
         'R::default': 'R::default_',
         'default': 'default_',
@@ -68,7 +86,9 @@ def rename(id):
         'R::union': 'R::union_'
     }.get(id, id)
 
+
 def to_cxx_str(expr):
+    """to_cxx_str."""
     if type(expr) is ast.Str:
         return string(expr.s)
     if type(expr) is ast.Num:
@@ -79,21 +99,29 @@ def to_cxx_str(expr):
         raise Discard("dict with non-string key")
     raise Unhandled("not string expr: " + ast.dump(expr))
 
+
 def is_null(expr):
+    """is_null."""
     return (type(expr) is ast.Name and expr.id in ['None', 'null']
-            or type(expr) is NameConstant and expr.value == None)
+            or type(expr) is NameConstant and expr.value is None)
+
 
 def is_bool(expr):
-    return (type(expr) is ast.Name and expr.id in ['true', 'false', 'True', 'False']
+    """is_bool."""
+    return (type(expr) is ast.Name and expr.id.lower() in ['true', 'false']
             or type(expr) is NameConstant and expr.value in [True, False])
 
+
 def to_cxx_expr(expr, prec, ctx):
+    """to_cxx_expr."""
     if ctx.type == 'query':
         if type(expr) in [ast.Str, ast.Num] or is_null(expr) or is_bool(expr):
             return "R::expr(" + to_cxx(expr, 17, ctx) + ")"
     return to_cxx(expr, prec, ctx)
 
+
 def to_cxx(expr, prec, ctx, parentType=None):
+    """to_cxx."""
     context = ctx.context
     ctx = Ctx(vars=ctx.vars, type=ctx.type, context=None)
     try:
@@ -103,15 +131,15 @@ def to_cxx(expr, prec, ctx, parentType=None):
                 f = repr(expr.n)
                 if "e" in f:
                     return f
-                else:
-                    return f + ".0"
-            else:
-                return repr(expr.n)
-        elif t == ast.Call:
-            #assert not expr.kwargs
-            #assert not expr.starargs
-            return to_cxx(expr.func, 2, ctx_set(ctx, context='function')) + to_args(expr.func, expr.args, expr.keywords, ctx)
-        elif t == ast.Attribute:
+                return f + ".0"
+            return repr(expr.n)
+        if t == ast.Call:
+            assert not expr.kwargs
+            assert not expr.starargs
+            return (
+                to_cxx(expr.func, 2, ctx_set(ctx, context='function')) +
+                to_args(expr.func, expr.args, expr.keywords, ctx))
+        if t == ast.Attribute:
             if type(expr.value) is ast.Name:
                 if expr.value.id == 'r':
                     if expr.attr == 'error' and context != 'function':
@@ -119,87 +147,114 @@ def to_cxx(expr, prec, ctx, parentType=None):
                     if expr.attr == 'binary':
                         if ctx.type == 'query':
                             return 'R::binary'
-                        else:
-                            return 'R::Binary'
+                        return 'R::Binary'
                     return rename("R::" + expr.attr)
-                elif expr.value.id == 'datetime':
+                if expr.value.id == 'datetime':
                     if expr.attr == 'fromtimestamp':
                         return "R::Time"
-                    elif expr.attr == 'now':
+                    if expr.attr == 'now':
                         return "R::Time::now"
             if expr.attr == 'RqlTzinfo':
                 return 'R::Time::parse_utc_offset'
             if expr.attr in ['encode', 'close']:
                 raise Discard(expr.attr + " not supported")
             return to_cxx_expr(expr.value, 2, ctx) + "." + rename(expr.attr)
-        elif t == ast.Name:
+        if t == ast.Name:
             if expr.id in ['frozenset']:
                 raise Discard("frozenset not supported")
-            elif expr.id in ctx.vars:
+            if expr.id in ctx.vars:
                 if ctx.type == 'query':
                     return parens(prec, 3, "*" + expr.id)
-                else:
-                    return expr.id
-            elif (expr.id == 'range' or expr.id == 'xrange') and ctx.type != 'query':
+                return expr.id
+            if (expr.id in ('range', 'xrange')) and ctx.type != 'query':
                 return 'array_range'
-            elif expr.id == 'nil' and ctx.type == 'query':
+            if expr.id == 'nil' and ctx.type == 'query':
                 return 'R::expr(nil)'
             return rename(expr.id)
-        elif t == NameConstant:
-            if expr.value == True:
+        if t == NameConstant:
+            if expr.value is True:
                 return "true"
-            elif expr.value == False:
+            if expr.value is False:
                 return "false"
-            elif expr.value == None:
+            if expr.value is None:
                 return "R::Nil()"
-            else:
-                raise Unhandled("constant: " + repr(expr.value))
-        elif t == ast.Subscript:
+            raise Unhandled("constant: " + repr(expr.value))
+        if t == ast.Subscript:
             st = type(expr.slice)
             if st == ast.Index:
-                return to_cxx(expr.value, 2, ctx) + "[" + to_cxx(expr.slice.value, 17, ctx) + "]"
+                return "{}[{}]".format(
+                    to_cxx(expr.value, 2, ctx),
+                    to_cxx(expr.slice.value, 17, ctx))
             if st == ast.Slice:
                 assert not expr.slice.step
                 if not expr.slice.upper:
-                    return to_cxx(expr.value, 2, ctx) + ".slice(" + to_cxx(expr.slice.lower, 17, ctx) + ")"
+                    return "{}.slice({})".format(
+                        to_cxx(expr.value, 2, ctx),
+                        to_cxx(expr.slice.lower, 17, ctx))
                 if not expr.slice.lower:
-                    return to_cxx(expr.value, 2, ctx) + ".limit(" + to_cxx(expr.slice.upper, 17, ctx) + ")"
-                return to_cxx(expr.value, 2, ctx) + ".slice(" + to_cxx(expr.slice.lower, 17, ctx) + ", " + to_cxx(expr.slice.upper, 17, ctx) + ")"
-            else:
-                raise Unhandled("slice type: " + repr(st))
-        elif t == ast.Dict:
+                    return "{}.limit({})".format(
+                        to_cxx(expr.value, 2, ctx),
+                        to_cxx(expr.slice.upper, 17, ctx))
+                return "{}.slice({}, {})".format(
+                    to_cxx(expr.value, 2, ctx),
+                    to_cxx(expr.slice.lower, 17, ctx),
+                    to_cxx(expr.slice.upper, 17, ctx))
+            raise Unhandled("slice type: " + repr(st))
+        if t == ast.Dict:
             if ctx.type == 'query':
-                return "R::object(" + ', '.join([to_cxx(k, 17, ctx) + ", " + to_cxx(v, 17, ctx) for k, v in zip(expr.keys, expr.values)]) + ")"
-            else:
-                return "R::Object{" + ', '.join(["{" + to_cxx_str(k) + ", " + to_cxx(v, 17, ctx) + "}" for k, v in zip(expr.keys, expr.values)]) + "}"
-        elif t == ast.Str:
+                return "R::object({}, {})".format(
+                    ', '.join([
+                        to_cxx(k, 17, ctx) + ", " + to_cxx(v, 17, ctx)
+                        for k, v in zip(expr.keys, expr.values)]))
+            return "R::object{{{}, {}}}".format(
+                ', '.join([
+                    "{" + to_cxx_str(k) + ", " + to_cxx(v, 17, ctx) + "}"
+                    for k, v in zip(expr.keys, expr.values)]))
+        if t == ast.Str:
             return string(expr.s, ctx)
-        elif t == ast.List:
+        if t == ast.List:
             if ctx.type == 'query':
-                return "R::array(" + ', '.join([to_cxx(el, 17, ctx) for el in expr.elts]) + ")"
-            else:
-                if parentType == ast.List:
-                    return "{ R::Array{" + ', '.join([to_cxx(el, 17, ctx, t) for el in expr.elts]) + "} }"
-                else:
-                    return "R::Array{" + ', '.join([to_cxx(el, 17, ctx, t) for el in expr.elts]) + "}"
-        elif t == ast.Lambda:
+                return "R::array({})".format(
+                    ', '.join([to_cxx(el, 17, ctx) for el in expr.elts]))
+            if parentType == ast.List:
+                return "{{ R::array{{{}}} }}".format(
+                    ', '.join([to_cxx(el, 17, ctx, t) for el in expr.elts]))
+            return "R::Array{{{}}}".format(
+                ', '.join([to_cxx(el, 17, ctx, t) for el in expr.elts]))
+        if t == ast.Lambda:
             assert not expr.args.vararg
             assert not expr.args.kwarg
-            ctx = ctx_set(ctx, vars = ctx.vars + [arg.arg for arg in expr.args.args])
-            return "[=](" + ', '.join(['R::Var ' + arg.arg for arg in expr.args.args]) + "){ return " + to_cxx_expr(expr.body, 17, ctx_set(ctx, type='query')) + "; }"
-        elif t == ast.BinOp:
+            ctx = ctx_set(
+                ctx,
+                vars=ctx.vars + [arg.arg for arg in expr.args.args])
+            return "[=]({}){{ return {}; }}".format(
+                ', '.join(['R::Var ' + arg.arg for arg in expr.args.args]),
+                to_cxx_expr(expr.body, 17, ctx_set(ctx, type='query')))
+        if t == ast.BinOp:
             if type(expr.op) is ast.Mult and type(expr.left) is ast.Str:
-                return "repeat(" + to_cxx(expr.left, 17, ctx) + ", " + to_cxx(expr.right, 17, ctx) + ")"
-            ll = type(expr.left) is ast.List or type(expr.left) is ast.ListComp
-            rl = type(expr.right) is ast.List or type(expr.right) is ast.ListComp
+                return "repeat({}, {})".format(
+                    to_cxx(expr.left, 17, ctx),
+                    to_cxx(expr.right, 17, ctx))
+            ll = isinstance(expr.left, (ast.List, ast.ListComp))
+            rl = isinstance(expr.right, (ast.List, ast.ListComp))
             op, op_prec = convert_op(expr.op)
             if type(expr.op) is ast.Add and ll and rl:
-                return "append(" + to_cxx_expr(expr.left, op_prec, ctx) + ", " + to_cxx(expr.right, op_prec, ctx) + ")"
+                return "append({}, {})".format(
+                    to_cxx_expr(expr.left, op_prec, ctx),
+                    to_cxx(expr.right, op_prec, ctx))
             if op_prec:
-                return parens(prec, op_prec, to_cxx_expr(expr.left, op_prec, ctx) + " " + op + " " + to_cxx(expr.right, op_prec, ctx))
-            else:
-                return op + "(" + to_cxx(expr.left, 17, ctx) + ", " + to_cxx(expr.right, 17, ctx) + ")"
-        elif t == ast.ListComp:
+                return parens(
+                    prec,
+                    op_prec,
+                    ' '.join((
+                        to_cxx_expr(expr.left, op_prec, ctx),
+                        op,
+                        to_cxx(expr.right, op_prec, ctx))))
+            return '{}({}, {})'.format(
+                op,
+                to_cxx(expr.left, 17, ctx),
+                to_cxx(expr.right, 17, ctx))
+        if t == ast.ListComp:
             assert len(expr.generators) == 1
             assert type(expr.generators[0]) == ast.comprehension
             assert type(expr.generators[0].target) == ast.Name
@@ -207,35 +262,47 @@ def to_cxx(expr, prec, ctx, parentType=None):
             seq = to_cxx(expr.generators[0].iter, 2, ctx)
             if ctx.type == 'query':
                 var = expr.generators[0].target.id
-                body = to_cxx(expr.elt, 17, ctx_set(ctx, vars = ctx.vars + [var]))
-                return seq + ".map([=](R::Var " + var + "){ return " + body + "; })"
-            else:
-                var = expr.generators[0].target.id
-                body = to_cxx(expr.elt, 17, ctx_set(ctx, vars = ctx.vars + [var]))
-                # assume int
-                return "array_map([=](int " + var + "){ return " + body + "; }, " + seq + ")"
-        elif t == ast.Compare:
+                body = to_cxx(
+                    expr.elt, 17, ctx_set(ctx, vars=ctx.vars + [var]))
+                return '{}.map([=](R::Var {}){ return {}; })'.format(
+                    seq, var, body)
+            var = expr.generators[0].target.id
+            body = to_cxx(expr.elt, 17, ctx_set(ctx, vars=ctx.vars + [var]))
+            # assume int
+            return 'array_map([=](int {}){ return {}; }, {})'.format(
+                var, body, seq)
+        if t == ast.Compare:
             assert len(expr.ops) == 1
             assert len(expr.comparators) == 1
             op, op_prec = convert_op(expr.ops[0])
-            return parens(prec, op_prec, to_cxx_expr(expr.left, op_prec, ctx) + op + to_cxx(expr.comparators[0], op_prec, ctx))
-        elif t == ast.UnaryOp:
+            return parens(
+                prec,
+                op_prec,
+                to_cxx_expr(expr.left, op_prec, ctx) +
+                op +
+                to_cxx(expr.comparators[0], op_prec, ctx))
+        if t == ast.UnaryOp:
             op, op_prec = convert_op(expr.op)
-            return parens(prec, op_prec, op + to_cxx(expr.operand, op_prec, ctx))
-        elif t == ast.Bytes:
+            return parens(
+                prec,
+                op_prec,
+                op + to_cxx(expr.operand, op_prec, ctx))
+        if t == ast.Bytes:
             return string(expr.s, ctx)
-        elif t == ast.Tuple:
+        if t == ast.Tuple:
             if ctx.type == 'query':
-                return "R::array(" + ', '.join([to_cxx(el, 17, ctx) for el in expr.elts]) + ")"
-            else:
-                return "R::Array{" + ', '.join([to_cxx(el, 17, ctx) for el in expr.elts]) + "}"
-        else:
-            raise Unhandled('ast type: ' + repr(t) + ', fields: ' + str(expr._fields))
+                return 'R::array({})'.format(
+                    ', '.join([to_cxx(el, 17, ctx) for el in expr.elts]))
+            return 'R::array{{{}}}'.format(
+                ', '.join([to_cxx(el, 17, ctx) for el in expr.elts]))
+        raise Unhandled('ast type: {!r}, fields: {}'.format(t, expr._fields))
     except Unhandled:
-        print("While translating: " + ast.dump(expr), file=stderr)
+        print("While translating: " + ast.dump(expr))  # stderr
         raise
 
+
 def ctx_set(ctx, context=None, vars=None, type=None):
+    """ctx_set."""
     if context is None:
         context = ctx.context
     if vars is None:
@@ -244,7 +311,9 @@ def ctx_set(ctx, context=None, vars=None, type=None):
         type = ctx.type
     return Ctx(vars=vars, type=type, context=context)
 
+
 def convert_op(op):
+    """convert_op."""
     t = type(op)
     if t == ast.Add:
         return '+', 6
@@ -278,10 +347,11 @@ def convert_op(op):
         return '||', 14
     if t == ast.Invert:
         return '!', 3
-    else:
-        raise Unhandled('op type: ' + repr(t))
+    raise Unhandled('op type: ' + repr(t))
+
 
 def to_args(func, args, optargs, ctx):
+    """to_args."""
     it = func
     while type(it) is ast.Attribute:
         it = it.value
@@ -296,41 +366,47 @@ def to_args(func, args, optargs, ctx):
     if o:
         out = []
         for f in o:
-            out.append("{" + string(f.arg) + ", R::expr(" + to_cxx(f.value, 17, ctx) + ")}")
+            out.append("{{{}, R::expr({})}}".format(
+                string(f.arg), to_cxx(f.value, 17, ctx)))
         if args:
             ret = ret + ", "
         ret = ret + "R::OptArgs{" + ', '.join(out) + "}"
     return ret + ")"
 
+
+def string_escape(c, wrap, was_hex):
+    """string_escape."""
+    if (
+        c < 32 or
+        c > 127 or
+        (
+            was_hex and chr(c) in "0123456789abcdefABCDEF")):
+        was_hex = True
+        return '\\x' + ('0' + hex(c)[2:])[-2:]
+    was_hex = False
+    if c == 34:
+        return '\\"'
+    if c == 92:
+        return '\\\\'
+    return chr(c)
+
+
 def string(s, ctx=None):
+    """string."""
     was_hex = False
     wrap = ctx and ctx.type == 'string'
     if type(s) is str:
         s = s.encode('utf8')
-    if type(s) is bytes:
-        def string_escape(c):
-            nonlocal wrap
-            nonlocal was_hex
-            if c == 0:
-                wrap = True
-            if c < 32 or c > 127 or (was_hex and chr(c) in "0123456789abcdefABCDEF"):
-                was_hex = True
-                return '\\x' + ('0' + hex(c)[2:])[-2:]
-            was_hex = False
-            if c == 34:
-                return '\\"'
-            if c == 92:
-                return '\\\\'
-            else:
-                return chr(c)
-    else:
+    if type(s) is not bytes:
         raise Unhandled("string type: " + repr(type(s)))
-    e = '"' + ''.join([string_escape(c) for c in s]) + '"'
+    e = '"' + ''.join([string_escape(c, wrap, was_hex) for c in s]) + '"'
     if wrap:
         return "std::string(" + e + ", " + str(len(s)) + ")"
     return e
 
+
 def parens(prec, in_prec, cxx):
+    """parens."""
     if in_prec >= prec:
         return "(" + cxx + ")"
     else:
@@ -341,22 +417,30 @@ print("#include \"testlib.h\"")
 
 indent = 0
 
-def p(s):
-    print((indent * "    ") + s);
 
-def enter(s = ""):
+def p(s):
+    """p."""
+    print((indent * "    ") + s)
+
+
+def enter(s=""):
+    """enter."""
     if s:
         p(s)
     global indent
     indent = indent + 1
 
-def exit(s = ""):
+
+def exit(s=""):
+    """exit."""
     global indent
     indent = indent - 1
     if s:
         p(s)
 
+
 def get(o, ks, d):
+    """get."""
     try:
         for k in ks:
             if k in o:
@@ -365,7 +449,9 @@ def get(o, ks, d):
         pass
     return d
 
+
 def python_tests(tests):
+    """python_tests."""
     for test in tests:
         runopts = get(test, ['runopts'], None)
         try:
@@ -389,7 +475,9 @@ def python_tests(tests):
                 for t in py:
                     yield py_str(t), ot, 'query', runopts
 
+
 def maybe_discard(py, ot):
+    """maybe_discard."""
     if ot is None:
         return
     if match(".*Expected .* argument", ot):
@@ -403,7 +491,7 @@ def maybe_discard(py, ot):
     if match(".*Got .* argument", ot):
         raise Discard("argument checks not supported")
     if match(".*AttributeError.*", ot):
-        raise Discard("attribute checks not supported, will cause a compiler error")
+        raise Discard("attribute checks not supported")
 
 data = parseYAML(open(argv[1]).read())
 
@@ -423,10 +511,11 @@ for py, ot, tp, runopts in python_tests(data["tests"]):
     try:
         maybe_discard(py, ot)
         assignment = match("\\A(\\w+) *= *([^=].*)\\Z", py, DOTALL)
-        if runopts:
-            args = ", R::optargs(" + ', '.join(['"' + k + '", ' + convert(py_str(runopts[k]), 17, name, 'value') for k in runopts]) + ")"
-        else:
-            args = ''
+        args = ", R::optargs({})".format(
+            ', '.join([
+                '{!r}, {}'.format(
+                    k, convert(py_str(runopts[k]), 17, name, 'value'))
+                for k in runopts])) if runopts else ''
         if assignment:
             var = assignment.group(1)
             if var == 'float_max':
@@ -443,20 +532,23 @@ for py, ot, tp, runopts in python_tests(data["tests"]):
                 if var in defined:
                     dvar = var
                 else:
-                    defined.append(var);
+                    defined.append(var)
                     dvar = "auto " + var
                 p("TEST_DO(" + dvar + " = (" + val + post + "));")
         elif ot:
-            p("TEST_EQ(maybe_run(%s, *conn%s), (%s));" % (convert(py, 2, name, 'query'), args, convert(ot, 17, name, 'datum')))
+            p("TEST_EQ(maybe_run({}, *conn{}), ({}));".format(
+                convert(py, 2, name, 'query'),
+                args,
+                convert(ot, 17, name, 'datum')))
         else:
-            p("TEST_DO(maybe_run(%s, *conn%s));" % (convert(py, 2, name, 'query'), args))
-    except Discard as exc:
+            p("TEST_DO(maybe_run({}, *conn{}));".format(
+                convert(py, 2, name, 'query'), args))
+    except Discard as e:
         if verbosity >= 1:
-            print("Discarding %s (%s): %s" % (repr(py), repr(ot), str(exc)), file=stderr)
-        pass
+            print("Discarding {!r} ({!r}): {}".format(py, ot, e))  # stderr
     except Unhandled as e:
         failed = True
-        print(argv[1] + ": could not translate: " + str(e), file=stderr)
+        print('{}: could not translate: {}'.format(argv[1], e))  # stderr
 
 p("section_cleanup();")
 p("exit_section();")
