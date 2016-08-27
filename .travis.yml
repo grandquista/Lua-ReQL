@@ -35,7 +35,6 @@ env:
     #   NGINX_VERSION="1.8.1"
 
 before_install:
-  - NGINX_VERSION ?= ""
   # setup nginx testing
   - |
     if [ ${NGINX_VERSION} != "" ]; then
