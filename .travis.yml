@@ -39,7 +39,7 @@ before_install:
   - |
     if [ -n "$NGINX_VERSION" ]; then
     sudo apt-get update
-    sudo apt-get install -qq -y cpanminus libluajit-5.1-dev
+    sudo apt-get install -qq -y cpanminus libluajit-5.1-dev luarocks
     sudo cpanm -v --notest Test::Nginx > build.log 2>&1 || cat build.log
     sudo cpanm -v --notest Test::Nginx::Socket > build.log 2>&1 || cat build.log
     git clone https://github.com/openresty/lua-cjson.git
