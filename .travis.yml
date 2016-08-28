@@ -62,6 +62,7 @@ before_install:
     source here/$LUA_PATH/bin/activate
     luarocks install luacheck
     fi
+  - ls -al
   - luacheck src
   # Fix from https://github.com/leafo/lapis/issues/6
   - |
