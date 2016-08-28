@@ -37,7 +37,7 @@ env:
 before_install:
   # setup nginx testing
   - |
-    if [ ${NGINX_VERSION} != "" ]; then
+    if [ -n "$NGINX_VERSION" ]; then
     sudo apt-get update
     sudo apt-get install -qq -y cpanminus libluajit-5.1-dev
     sudo cpanm -v --notest Test::Nginx > build.log 2>&1 || cat build.log
@@ -51,11 +51,11 @@ before_install:
     ./configure --with-debug --with-cc-opt="-DDEBUG_MALLOC" --add-module=../lua-nginx-module > build.log 2>&1 || (cat build.log && exit 1)
     make -j$JOBS > build.log 2>&1 || (cat build.log && exit 1)
     export PATH=$PATH:`pwd`/objs
-    cd .. # previous line changes cwd
+    cd ..
     fi
   # setup busted testing
   - |
-    if [ ${NGINX_VERSION} == "" ]; then
+    if [ -z "$NGINX_VERSION" ]; then
     pip install hererocks
     hererocks here/$LUA_PATH -r^ --$LUA
     source here/$LUA_PATH/bin/activate
@@ -64,7 +64,7 @@ before_install:
   - luacheck src
   # Fix from https://github.com/leafo/lapis/issues/6
   - |
-    if [ ${LUA} == "lua 5.3" ] then
+    if [ "$LUA" = "lua 5.3" ] then
     luarocks install https://gist.githubusercontent.com/starius/b20d3e63929ae678c857/raw/4b4499f442337b6f577422364358590bd00c9d48/luacrypto-0.3.2-2.rockspec
     fi
 
@@ -78,18 +78,18 @@ before_script:
   - ./usr/bin/rethinkdb --daemon
   # install busted testing
   - |
-    if [ ${NGINX_VERSION} == "" ]; then
+    if [ -z "$NGINX_VERSION" ]; then
     luarocks install busted
     luarocks install luacov-coveralls
     fi
 
 script:
   - |
-    if [ ${NGINX_VERSION} == "" ]; then
+    if [ -z "$NGINX_VERSION" ]; then
     busted --exclude-tags="expensive"
     fi
   - |
-    if [ ${NGINX_VERSION} != "" ]; then
+    if [ -n "$NGINX_VERSION" ]; then
     prove -r t
     fi
 
