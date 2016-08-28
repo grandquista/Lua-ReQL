@@ -39,7 +39,7 @@ before_install:
   - |
     if [ -n "$NGINX_VERSION" ]; then
     sudo apt-get update
-    sudo apt-get install -qq -y cpanminus libluajit-5.1-dev luarocks
+    sudo apt-get install -qq -y libssl-dev cpanminus libluajit-5.1-dev luarocks
     sudo cpanm -v --notest Test::Nginx > build.log 2>&1 || cat build.log
     sudo cpanm -v --notest Test::Nginx::Socket > build.log 2>&1 || cat build.log
     git clone https://github.com/openresty/lua-cjson.git
@@ -64,7 +64,7 @@ before_install:
     source here/$LUA_PATH/bin/activate
     luarocks install luacheck
     fi
-  - ls -al
+  - ls -al $LUAJIT_INC
   - luacheck src
   # Fix from https://github.com/leafo/lapis/issues/6
   - |
