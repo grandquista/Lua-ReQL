@@ -52,6 +52,7 @@ before_install:
     make -j$JOBS > build.log 2>&1 || (cat build.log && exit 1)
     export PATH=$PATH:`pwd`/objs
     cd ..
+    sudo luarocks install luacheck
     fi
   # setup busted testing
   - |
@@ -59,8 +60,8 @@ before_install:
     pip install hererocks
     hererocks here/$LUA_PATH -r^ --$LUA
     source here/$LUA_PATH/bin/activate
+    luarocks install luacheck
     fi
-  - luarocks install luacheck
   - luacheck src
   # Fix from https://github.com/leafo/lapis/issues/6
   - |
@@ -69,7 +70,14 @@ before_install:
     fi
 
 install:
-  - luarocks build --only-deps lua-reql-1.0.2-0.rockspec
+  - |
+    if [ -z "$NGINX_VERSION" ]; then
+    luarocks build --only-deps lua-reql-1.0.2-0.rockspec
+    fi
+  - |
+    if [ -n "$NGINX_VERSION" ]; then
+    sudo luarocks build --only-deps lua-reql-1.0.2-0.rockspec
+    fi
 
 before_script:
   - wget http://download.rethinkdb.com/apt/pool/precise/main/r/rethinkdb/rethinkdb_${RDB_VER}precise_amd64.deb
