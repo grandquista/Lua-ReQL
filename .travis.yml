@@ -43,7 +43,9 @@ before_install:
     sudo cpanm -v --notest Test::Nginx > build.log 2>&1 || cat build.log
     sudo cpanm -v --notest Test::Nginx::Socket > build.log 2>&1 || cat build.log
     git clone https://github.com/openresty/lua-cjson.git
-    cd lua-cjson && make -j$JOBS && sudo make install && cd ..
+    cd lua-cjson
+    make -j$JOBS && sudo make install
+    cd ..
     git clone https://github.com/openresty/lua-nginx-module.git
     wget http://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz
     tar xzf nginx-${NGINX_VERSION}.tar.gz
