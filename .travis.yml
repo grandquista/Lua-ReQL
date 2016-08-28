@@ -68,7 +68,7 @@ before_install:
   - luacheck src
   # Fix from https://github.com/leafo/lapis/issues/6
   - |
-    if [ "$LUA" = "lua 5.3" ] then
+    if [ "$LUA" = "lua 5.3" ]; then
     luarocks install https://gist.githubusercontent.com/starius/b20d3e63929ae678c857/raw/4b4499f442337b6f577422364358590bd00c9d48/luacrypto-0.3.2-2.rockspec
     fi
 
