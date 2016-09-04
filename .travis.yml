@@ -1,5 +1,5 @@
 language: python
-sudo: required
+sudo: false
 
 cache:
   pip: true
@@ -8,101 +8,47 @@ cache:
 
 env:
   global:
-    - RDB_VER="2.3.0~0"
-    - JOBS="3"
-    - LUAJIT_LIB=/usr/lib64/libluajit-5.1.so
-    - LUAJIT_INC=/usr/include/luajit-2.0
+    - RDB_VER="2.3.5~0"
   matrix:
-    # - |
-    #   LUA="lua 5.1"
-    #   LUA_PATH="lua51"
-    # - |
-    #   LUA="lua 5.2"
-    #   LUA_PATH="lua52"
-    # - |
-    #   LUA="lua 5.3"
-    #   LUA_PATH="lua53"
-    #   RDB_VER="2.3.4~0"
-    # - |
-    #   LUA="luajit 2.0"
-    #   LUA_PATH="jit20"
-    # - |
-    #   LUA="luajit 2.1"
-    #   LUA_PATH="jit21"
-    - |
-      NGINX_VERSION="1.9.15"
-    # - |
-    #   NGINX_VERSION="1.8.1"
+     - |
+       LUA="lua 5.1"
+       LUA_PATH="lua51"
+     - |
+       LUA="lua 5.2"
+       LUA_PATH="lua52"
+     - |
+       LUA="lua 5.3"
+       LUA_PATH="lua53"
+       RDB_VER="2.3.4~0"
+     - |
+       LUA="luajit 2.0"
+       LUA_PATH="jit20"
+     - |
+       LUA="luajit 2.1"
+       LUA_PATH="jit21"
 
 before_install:
-  # setup nginx testing
-  - |
-    if [ -n "$NGINX_VERSION" ]; then
-    sudo apt-get update
-    sudo apt-get install -qq -y libssl-dev cpanminus libluajit-5.1-dev luarocks
-    sudo cpanm -v --notest Test::Nginx > build.log 2>&1 || cat build.log
-    sudo cpanm -v --notest Test::Nginx::Socket > build.log 2>&1 || cat build.log
-    git clone https://github.com/openresty/lua-cjson.git
-    cd lua-cjson
-    make -j$JOBS && sudo make install
-    cd ..
-    git clone https://github.com/openresty/lua-nginx-module.git
-    wget http://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz
-    tar xzf nginx-${NGINX_VERSION}.tar.gz
-    cd nginx-${NGINX_VERSION}/
-    ./configure --with-debug --with-cc-opt="-DDEBUG_MALLOC" --add-module=../lua-nginx-module > build.log 2>&1 || (cat build.log && exit 1)
-    make -j$JOBS > build.log 2>&1 || (cat build.log && exit 1)
-    export PATH=$PATH:`pwd`/objs
-    cd ..
-    sudo luarocks install luacheck
-    fi
-  # setup busted testing
-  - |
-    if [ -z "$NGINX_VERSION" ]; then
-    pip install hererocks
-    hererocks here/$LUA_PATH -r^ --$LUA
-    source here/$LUA_PATH/bin/activate
-    luarocks install luacheck
-    fi
-  - ls -al $LUAJIT_INC
+  - pip install hererocks
+  - hererocks here/$LUA_PATH -r^ --$LUA
+  - source here/$LUA_PATH/bin/activate
+  - luarocks install luacheck
   - luacheck src
   # Fix from https://github.com/leafo/lapis/issues/6
-  - |
-    if [ "$LUA" = "lua 5.3" ]; then
-    luarocks install https://gist.githubusercontent.com/starius/b20d3e63929ae678c857/raw/4b4499f442337b6f577422364358590bd00c9d48/luacrypto-0.3.2-2.rockspec
-    fi
+  - luarocks install https://gist.githubusercontent.com/starius/b20d3e63929ae678c857/raw/4b4499f442337b6f577422364358590bd00c9d48/luacrypto-0.3.2-2.rockspec
 
 install:
-  - |
-    if [ -z "$NGINX_VERSION" ]; then
-    luarocks build --only-deps lua-reql-1.0.2-0.rockspec
-    fi
-  - |
-    if [ -n "$NGINX_VERSION" ]; then
-    sudo luarocks build --only-deps lua-reql-1.0.2-0.rockspec
-    fi
+  - luarocks build --only-deps lua-reql-1.0.2-0.rockspec
 
 before_script:
-  - wget http://download.rethinkdb.com/apt/pool/precise/main/r/rethinkdb/rethinkdb_${RDB_VER}precise_amd64.deb
+  - wget https://download.rethinkdb.com/apt/pool/precise/main/r/rethinkdb/rethinkdb_${RDB_VER}precise_amd64.deb
   - ar x rethinkdb_${RDB_VER}precise_amd64.deb
   - tar xvzf data.tar.gz
   - ./usr/bin/rethinkdb --daemon
-  # install busted testing
-  - |
-    if [ -z "$NGINX_VERSION" ]; then
-    luarocks install busted
-    luarocks install luacov-coveralls
-    fi
+  - luarocks install busted
+  - luarocks install luacov-coveralls
 
 script:
-  - |
-    if [ -z "$NGINX_VERSION" ]; then
-    busted --exclude-tags="expensive"
-    fi
-  - |
-    if [ -n "$NGINX_VERSION" ]; then
-    prove -r t
-    fi
+  - busted --exclude-tags="expensive"
 
 before_cache:
   - rm -rf $HOME/.cache/pip/log
