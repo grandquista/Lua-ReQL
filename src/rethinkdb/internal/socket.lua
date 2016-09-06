@@ -5,6 +5,8 @@
 -- @copyright Adam Grandquist 2016
 
 local ssl = require('ssl')
+local socket_sink = require('socket').sink
+local socket_source = require('socket').source
 
 local function socket(r, host, port, ssl_params, timeout)
   local raw_socket, init_err = r.tcp()
@@ -13,9 +15,13 @@ local function socket(r, host, port, ssl_params, timeout)
     return nil, init_err
   end
 
-  raw_socket:settimeout(timeout)
+  local status = pcall(raw_socket:settimeout, timeout, 't') and
+    pcall(raw_socket:settimeout, timeout, 'b') or
+    pcall(raw_socket:settimeout, timeout)
 
-  local status
+  if not status then
+    return nil, 'Failed to set timeout'
+  end
 
   status, init_err = raw_socket:connect(host, port)
 
@@ -41,10 +47,10 @@ local function socket(r, host, port, ssl_params, timeout)
 
   local socket_inst = {}
 
-  socket_inst.sink = r.socket.sink('keep-open', raw_socket)
+  socket_inst.sink = socket_sink('keep-open', raw_socket)
 
   function socket_inst.source(_r, length)
-    return _r.socket.source('by-length', raw_socket, length)
+    return socket_source('by-length', raw_socket, length)
   end
 
   function socket_inst.close()

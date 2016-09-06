@@ -14,8 +14,6 @@ if ngx == nil then  --luacheck: globals ngx
 else
   json = require('cjson')
   socket = ngx.socket  --luacheck: globals ngx
-  socket.sink = require('socket').sink
-  socket.source = require('socket').source
 end
 
 local m = {}
