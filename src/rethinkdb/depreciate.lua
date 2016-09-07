@@ -7,7 +7,7 @@
 local int_to_little = require'rethinkdb.internal.int_to_bytes'.little
 local ltn12 = require('ltn12')
 
-local function proto_V0_x(r, socket_inst, auth_key, magic)
+local function proto_V0_x(socket_inst, auth_key, magic)
   -- Initialize connection with magic number to validate version
 
   local data = table.concat{
@@ -27,14 +27,14 @@ local function proto_V0_x(r, socket_inst, auth_key, magic)
   -- acknowledging the connection
   while true do
     if string.len(table.concat(buffer)) > 8 then
-      success, err = ltn12.pump.all(socket_inst.source(r, 1), sink)
+      success, err = ltn12.pump.all(socket_inst.source(1), sink)
       socket_inst.close()
       if not success then
         return nil, err
       end
       return nil, table.concat(buffer)
     end
-    success, err = ltn12.pump.step(socket_inst.source(r, 1), sink)
+    success, err = ltn12.pump.step(socket_inst.source(1), sink)
     if not success then
       return nil, err
     end
@@ -52,14 +52,14 @@ function m.init(r)
   -- server version 1.16+. Passed to proto_version connection option. Will be
   -- removed in driver version 2.
   function r.proto_V0_3(_, socket_inst, auth_key)
-    return proto_V0_x(r, socket_inst, auth_key, '\62\232\117\95')
+    return proto_V0_x(socket_inst, auth_key, '\62\232\117\95')
   end
 
   --- Depreciated implementation of RethinkDB handshake version 0.4. Supports
   -- server version 2.0+. Passed to proto_version connection option. Will be
   -- removed in driver version 2.
   function r.proto_V0_4(_, socket_inst, auth_key)
-    return proto_V0_x(r, socket_inst, auth_key, '\32\45\12\64')
+    return proto_V0_x(socket_inst, auth_key, '\32\45\12\64')
   end
 end
 

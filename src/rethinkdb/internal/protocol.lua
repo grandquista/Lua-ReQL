@@ -156,8 +156,8 @@ local function protocol(socket_inst)
     return write_socket(get_token(), SERVER_INFO)
   end
 
-  function protocol_inst.source(r)
-    return ltn12.source.chain(socket_inst.source(r, ctx.response_length or 12), filter)
+  function protocol_inst.source()
+    return ltn12.source.chain(socket_inst.source(ctx.response_length or 12), filter)
   end
 
   return protocol_inst

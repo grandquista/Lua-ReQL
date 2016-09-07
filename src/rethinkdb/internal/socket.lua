@@ -53,7 +53,7 @@ local function socket(r, host, port, ssl_params, timeout)
 
   socket_inst.sink = socket_sink('keep-open', raw_socket)
 
-  function socket_inst.source(_r, length)
+  function socket_inst.source(length)
     return socket_source('by-length', raw_socket, length)
   end
 
