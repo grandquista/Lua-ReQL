@@ -120,7 +120,7 @@ local function connection_instance(r, handshake_inst, host, port, ssl_params, ti
     function state.step()
       -- Buffer data, execute return results if need be
       while not responses[token] do
-        local success, err = ltn12.pump.step(protocol_inst.source(conn_inst.r), sink)
+        local success, err = ltn12.pump.step(protocol_inst.source(), sink)
         if not success then
           return reset(err)
         end

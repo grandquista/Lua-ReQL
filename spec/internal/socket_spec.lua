@@ -42,7 +42,7 @@ describe('socket', function()
       'server?\n\0',
     }
 
-    assert.is_truthy(ltn12.pump.all(client.source(r, string.len(expected)), sink))
+    assert.is_truthy(ltn12.pump.all(client.source(string.len(expected)), sink))
 
     local message = table.concat(buffer)
 

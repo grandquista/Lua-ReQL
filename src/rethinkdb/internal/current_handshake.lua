@@ -90,7 +90,7 @@ local function current_handshake(r, socket_inst, auth_key, user)
   local function get_message()
     local i = string.find(buffer, '\0')
     while not i do
-      local success, err = ltn12.pump.step(socket_inst.source(r, 1), sink)
+      local success, err = ltn12.pump.step(socket_inst.source(1), sink)
       if not success then
         return nil, err
       end
