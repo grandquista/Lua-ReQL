@@ -43,6 +43,26 @@ describe('connection', function()
     assert.is_table(err.ReQLAuthError)
   end)
 
+  it('good password', function()
+    local key = 'Is_this_an_improved_authentication_key?'
+
+    local conn, err = r.connect()
+    assert.is_nil(err)
+    assert.is_table(conn)
+    assert.is_true(conn.is_open())
+
+    local users = r.db'rethinkdb'.table'users'
+
+    assert.is_table(users.insert{id = 'devops', password = key}.run(conn)).to_array()
+    assert.is_table(users.insert{id = 'dev', password = key, iterations = 64}.run(conn)).to_array()
+
+    assert.is_true(assert.is_table(r.connect{user = 'devops', password = key}).is_open())
+    assert.is_true(assert.is_table(r.connect{user = 'dev', password = key}).is_open())
+
+    assert.is_true(conn.is_open())
+    assert.is_table(users.get('dev', 'devops').delete().run(conn)).to_array()
+  end)
+
   it('return conn', function()
     local conn, err = r.connect()
     assert.is_nil(err)
