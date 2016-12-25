@@ -4,6 +4,7 @@
 -- @license Apache
 -- @copyright Adam Grandquist 2016
 
+local errors = require'rethinkdb.errors'
 local little_to_int = require'rethinkdb.internal.bytes_to_int'.little
 local int_to_little = require'rethinkdb.internal.int_to_bytes'.little
 local ltn12 = require('ltn12')
@@ -110,11 +111,11 @@ local function protocol(socket_inst)
   local ctx = {buffer = ''}
   local filter = ltn12.filter.cycle(buffer_response, ctx)
 
-  local function write_socket(token, data)
+  local function write_socket(r, token, data)
     data = table.concat{int_to_little(token, 8), int_to_little(string.len(data), 4), data}
     local success, err = ltn12.pump.all(ltn12.source.string(data), socket_inst.sink)
     if not success then
-      return nil, err
+      return nil, errors.ReQLDriverError(r, err .. ': writing socket')
     end
     return token
   end
@@ -136,24 +137,27 @@ local function protocol(socket_inst)
     end
 
     -- Assign token
-    local data = protect(r.encode, query)
-    return write_socket(get_token(), data)
+    local data, err = protect(r.encode, query)
+    if not data then
+      return nil, errors.ReQLDriverError(r, err .. ': encoding query')
+    end
+    return write_socket(r, get_token(), data)
   end
 
-  function protocol_inst.continue_query(token)
-    return write_socket(token, CONTINUE)
+  function protocol_inst.continue_query(r, token)
+    return write_socket(r, token, CONTINUE)
   end
 
-  function protocol_inst.end_query(token)
-    return write_socket(token, STOP)
+  function protocol_inst.end_query(r, token)
+    return write_socket(r, token, STOP)
   end
 
-  function protocol_inst.noreply_wait()
-    return write_socket(get_token(), NOREPLY_WAIT)
+  function protocol_inst.noreply_wait(r)
+    return write_socket(r, get_token(), NOREPLY_WAIT)
   end
 
-  function protocol_inst.server_info()
-    return write_socket(get_token(), SERVER_INFO)
+  function protocol_inst.server_info(r)
+    return write_socket(r, get_token(), SERVER_INFO)
   end
 
   function protocol_inst.source()

@@ -5,6 +5,7 @@
 -- @copyright Adam Grandquist 2016
 
 local crypto = require('crypto')
+local errors = require'rethinkdb.errors'
 local ltn12 = require('ltn12')
 local pbkdf2 = require'rethinkdb.internal.pbkdf'
 local protect = require'rethinkdb.internal.protect'
@@ -39,7 +40,7 @@ local function bxor256(u, t)
   return string.char(unpack(res))
 end
 
-local function __compare_digest(a, b)
+local function compare_digest(a, b)
   local result
 
   if string.len(a) == string.len(b) then
@@ -54,6 +55,13 @@ local function __compare_digest(a, b)
   end
 
   return result ~= 0
+end
+
+local function maybe_auth_err(r, err, append)
+  if 10 <= err.error_code and err.error_code <= 20 then
+    return nil, errors.ReQLAuthError(r, err.error .. append)
+  end
+  return nil, errors.ReQLDriverError(r, err.error .. append)
 end
 
 local function current_handshake(r, socket_inst, auth_key, user)
@@ -104,7 +112,7 @@ local function current_handshake(r, socket_inst, auth_key, user)
 
   local success, err = send'\195\189\194\52'
   if not success then
-    return nil, err
+    return nil, errors.ReQLDriverError(r, err .. ': sending magic number')
   end
 
   -- Now we have to wait for a response from the server
@@ -114,17 +122,17 @@ local function current_handshake(r, socket_inst, auth_key, user)
   local message
   message, err = get_message()
   if not message then
-    return nil, err
+    return nil, errors.ReQLDriverError(r, err .. ': in first response')
   end
 
   local response = protect(r.decode, message)
 
   if not response then
-    return nil, message
+    return nil, errors.ReQLDriverError(r, message .. ': in first response')
   end
 
   if not response.success then
-    return nil, response
+    return maybe_auth_err(r, response, ': in first response')
   end
 
   local nonce = r.b64(rand_bytes(18))
@@ -143,7 +151,7 @@ local function current_handshake(r, socket_inst, auth_key, user)
     authentication = 'n,,' .. client_first_message_bare
   }
   if not success then
-    return nil, err
+    return nil, errors.ReQLDriverError(r, err .. ': encoding SCRAM challenge')
   end
 
 
@@ -156,17 +164,17 @@ local function current_handshake(r, socket_inst, auth_key, user)
 
   message, err = get_message()
   if not message then
-    return nil, err
+    return nil, errors.ReQLDriverError(r, err .. ': in second response')
   end
 
   response, err = protect(r.decode, message)
 
   if not response then
-    return nil, err
+    return nil, errors.ReQLDriverError(r, err .. ': decoding second response')
   end
 
   if not response.success then
-    return nil, response
+    return maybe_auth_err(r, response, ': in second response')
   end
 
   -- the authentication property will need to be retained
@@ -178,7 +186,7 @@ local function current_handshake(r, socket_inst, auth_key, user)
   end
 
   if string.sub(authentication.r, 1, string.len(nonce)) ~= nonce then
-    return nil, 'Invalid nonce'
+    return nil, errors.ReQLDriverError(r, 'Invalid nonce')
   end
 
   authentication.i = tonumber(authentication.i)
@@ -188,7 +196,11 @@ local function current_handshake(r, socket_inst, auth_key, user)
   local salt = r.unb64(authentication.s)
 
   -- SaltedPassword := Hi(Normalize(password), salt, i)
-  local salted_password = pbkdf2('sha256', auth_key, salt, authentication.i, 32)
+  local salted_password, str_err = pbkdf2('sha256', auth_key, salt, authentication.i, 32)
+
+  if not salted_password then
+    return nil, errors.ReQLDriverError(r, str_err)
+  end
 
   -- ClientKey := HMAC(SaltedPassword, "Client Key")
   local client_key = crypto.hmac.digest('sha256', 'Client Key', salted_password, true)
@@ -224,7 +236,7 @@ local function current_handshake(r, socket_inst, auth_key, user)
     table.concat{client_final_message_without_proof, ',p=', r.b64(client_proof)}
   }
   if not success then
-    return nil, err
+    return nil, errors.ReQLDriverError(r, err .. ': encoding SCRAM response')
   end
 
   -- wait for the third server challenge
@@ -235,17 +247,17 @@ local function current_handshake(r, socket_inst, auth_key, user)
   -- }
   message, err = get_message()
   if not message then
-    return nil, err
+    return nil, errors.ReQLDriverError(r, err .. ': in third response')
   end
 
   response, err = protect(r.decode, message)
 
   if not response then
-    return nil, err
+    return nil, errors.ReQLDriverError(r, err .. ': decoding third response')
   end
 
   if not response.success then
-    return nil, response
+    return maybe_auth_err(r, response, ': in third response')
   end
 
   response_authentication = response.authentication .. ','
@@ -254,14 +266,17 @@ local function current_handshake(r, socket_inst, auth_key, user)
   end
 
   if not authentication.v then
-    return nil, response
+    return nil, errors.ReQLDriverError(
+      r,
+      message .. ': missing server signature'
+    )
   end
 
-  if not __compare_digest(authentication.v, server_signature) then
-    return nil, response
+  if compare_digest(authentication.v, server_signature) then
+    return true
   end
 
-  return true
+  return nil, errors.ReQLAuthError(r, 'invalid server signature')
 end
 
 return current_handshake

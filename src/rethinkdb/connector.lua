@@ -39,6 +39,14 @@ function m.init(r)
     local connector_inst = setmetatable({r = r}, connector_inst_meta_table)
 
     function connector_inst.connect(callback)
+      local connection = connection_instance(
+        connector_inst.r,
+        handshake_inst,
+        host,
+        port,
+        ssl_params,
+        timeout
+      )
       if callback then
         local function cb(err, conn)
           if err then
@@ -47,24 +55,10 @@ function m.init(r)
           conn.use(db)
           return callback(nil, conn)
         end
-        return connection_instance(
-          connector_inst.r,
-          handshake_inst,
-          host,
-          port,
-          ssl_params,
-          timeout
-        ).connect(cb)
+        return connection.connect(cb)
       end
 
-      local conn, err = connection_instance(
-        connector_inst.r,
-        handshake_inst,
-        host,
-        port,
-        ssl_params,
-        timeout
-      ).connect()
+      local conn, err = connection.connect()
       if err then
         return nil, err
       end
