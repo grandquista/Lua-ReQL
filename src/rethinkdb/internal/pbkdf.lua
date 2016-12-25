@@ -23,7 +23,7 @@ end
 local _, bits = assert(prequire(
   'rethinkdb.internal.bits53', 'bit32', 'bit', 'rethinkdb.internal.bits51'))
 
-local crypto = require('crypto')
+local hmac = require('openssl.hmac')
 
 local bxor = bits.bxor
 
@@ -42,8 +42,10 @@ end
 -- iteration count a positive integer
 -- dkLen length in octets of derived key, a positive integer
 local function hmac_pbkdf2(dtype, password, salt, iteration, dkLen)
+  --- underlying pseudorandom function
+  -- local hmac = openssl.hmac.new(dtype, password)
   local function PRF(P, S)
-    return crypto.hmac.digest(dtype, S, P, true)
+    return hmac.digest(dtype, S, P)
   end
 
   -- length in octets of pseudorandom function output, a positive integer
@@ -63,9 +65,6 @@ local function hmac_pbkdf2(dtype, password, salt, iteration, dkLen)
   -- ...
   -- T_l = F (P, S, c, l) ,
   local T = {}
-
-  --- underlying pseudorandom function
-  -- local hmac = crypto.hmac.new(dtype, password)
 
   for i=1, l do
     --- intermediate values, octet strings

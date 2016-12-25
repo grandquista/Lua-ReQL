@@ -4,9 +4,11 @@
 -- @license Apache
 -- @copyright Adam Grandquist 2016
 
-local crypto = require('crypto')
 local errors = require'rethinkdb.errors'
 local ltn12 = require('ltn12')
+local digest = require('openssl.digest')
+local hmac = require('openssl.hmac')
+local rand = require('openssl.rand')
 local pbkdf2 = require'rethinkdb.internal.pbkdf'
 local protect = require'rethinkdb.internal.protect'
 
@@ -28,9 +30,11 @@ local bits = prequire(
 
 local bor = bits.bor
 local bxor = bits.bxor
-local rand_bytes = crypto.rand.bytes
+local rand_bytes = rand.bytes
 
 local unpack = _G.unpack or table.unpack
+
+assert(rand.ready())
 
 local function bxor256(u, t)
   local res = {}
@@ -203,10 +207,10 @@ local function current_handshake(r, socket_inst, auth_key, user)
   end
 
   -- ClientKey := HMAC(SaltedPassword, "Client Key")
-  local client_key = crypto.hmac.digest('sha256', 'Client Key', salted_password, true)
+  local client_key = hmac.digest('sha256', 'Client Key', salted_password)
 
   -- StoredKey := H(ClientKey)
-  local stored_key = crypto.digest('sha256', client_key, true)
+  local stored_key = digest.new('sha256'):final(client_key)
 
   -- AuthMessage := client-first-message-bare + "," +
   --                server-first-message + "," +
@@ -217,15 +221,15 @@ local function current_handshake(r, socket_inst, auth_key, user)
       client_final_message_without_proof}, ',')
 
   -- ClientSignature := HMAC(StoredKey, AuthMessage)
-  local client_signature = crypto.hmac.digest('sha256', auth_message, stored_key, true)
+  local client_signature = hmac.digest('sha256', auth_message, stored_key)
 
   local client_proof = bxor256(client_key, client_signature)
 
   -- ServerKey := HMAC(SaltedPassword, "Server Key")
-  local server_key = crypto.hmac.digest('sha256', 'Server Key', salted_password, true)
+  local server_key = hmac.digest('sha256', 'Server Key', salted_password)
 
   -- ServerSignature := HMAC(ServerKey, AuthMessage)
-  local server_signature = crypto.hmac.digest('sha256', auth_message, server_key, true)
+  local server_signature = hmac.digest('sha256', auth_message, server_key)
 
   -- send the third client message
   -- {
