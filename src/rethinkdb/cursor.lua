@@ -96,10 +96,7 @@ local function each(state, var)
     end
     local success, err = state.step()
     if not success then
-      if type(err) == 'table' then
-        return 0, err
-      end
-      return 0, errors.ReQLDriverError({}, err)
+      return 0, err
     end
   end
   local row = state.it()
@@ -160,11 +157,10 @@ local function cursor(r, state, options, reql_inst)
     end
   end
 
-  --- Set or clear a callback for asynchronous processing of query results.
-  -- This callback will only be called if another
-  -- cursor from the same connection is retrieving rows synchronously. Calling
-  -- without arguments clears any previous function set, and retains results for
-  -- future retrieval.
+  --- Set or clear a callback for asynchronous processing of query results. This
+  -- callback will only be called if another cursor from the same connection is
+  -- retrieving rows synchronously. Calling without arguments clears any
+  -- previous function set, and retains results for future retrieval.
   function cursor_inst.set(callback)
     state.outstanding_callback = callback
     if callback then
@@ -196,7 +192,8 @@ local function cursor(r, state, options, reql_inst)
   -- the server. If this is 0 then the row is an error. This error will be
   -- returned forever and the caller is responsible for breaking out of the
   -- loop. The second variable is a row result from the query or an error.
-  -- Errors returned in a loop do not have valid links to the driver instance.
+  -- Errors returned in a loop may be strings if a valid link to the driver
+  -- instance is not available.
   function cursor_inst.each()
     cursor_inst.set()
     return each, state, 0

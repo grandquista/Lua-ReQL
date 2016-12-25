@@ -4,6 +4,7 @@
 -- @license Apache
 -- @copyright Adam Grandquist 2016
 
+local errors = require'rethinkdb.errors'
 local ssl = require('ssl')
 local socket_sink = require('socket').sink
 local socket_source = require('socket').source
@@ -13,10 +14,10 @@ local function settimeout(socket, ...)
 end
 
 local function socket(r, host, port, ssl_params, timeout)
-  local raw_socket, init_err = r.tcp()
+  local raw_socket, err = r.tcp()
 
   if not raw_socket then
-    return nil, init_err
+    return nil, errors.ReQLDriverError(r, err .. ': opening socket')
   end
 
   local status = settimeout(raw_socket, timeout, 't') and
@@ -24,27 +25,28 @@ local function socket(r, host, port, ssl_params, timeout)
     settimeout(raw_socket, timeout)
 
   if not status then
-    return nil, 'Failed to set timeout'
+    return nil, errors.ReQLDriverError(r, 'Failed to set timeout')
   end
 
-  status, init_err = raw_socket:connect(host, port)
+  status, err = raw_socket:connect(host, port)
 
   if not status then
-    return nil, init_err
+    return nil, errors.ReQLDriverError(r, err .. ': connecting socket')
   end
 
   if ssl_params then
-    raw_socket, init_err = ssl.wrap(raw_socket, ssl_params)
+    raw_socket, err = ssl.wrap(raw_socket, ssl_params)
 
     if not raw_socket then
-      return nil, init_err
+      return nil, errors.ReQLDriverError(r, err .. ': wrapping socket in ssl')
     end
 
     status = false
     while not status do
-      status, init_err = raw_socket:dohandshake()
-      if init_err == 'closed' then
-        return nil, init_err
+      status, err = raw_socket:dohandshake()
+      if err == 'closed' then
+        return nil, errors.ReQLDriverError(
+          r, 'socket closed durring ssl handshake')
       end
     end
   end
