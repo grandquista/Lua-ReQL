@@ -33,8 +33,6 @@ before_install:
   - source here/$LUA_PATH/bin/activate
   - luarocks install luacheck
   - luacheck src
-  # Fix from https://github.com/leafo/lapis/issues/6
-  - luarocks install https://gist.githubusercontent.com/starius/b20d3e63929ae678c857/raw/4b4499f442337b6f577422364358590bd00c9d48/luacrypto-0.3.2-2.rockspec
 
 install:
   - luarocks build --only-deps lua-reql-1.0.3-0.rockspec
