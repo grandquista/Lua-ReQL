@@ -45,7 +45,7 @@ local function hmac_pbkdf2(dtype, password, salt, iteration, dkLen)
   --- underlying pseudorandom function
   -- local hmac = openssl.hmac.new(dtype, password)
   local function PRF(P, S)
-    return hmac.digest(dtype, S, P)
+    return hmac.digest.new(P, dtype):final(S)
   end
 
   -- length in octets of pseudorandom function output, a positive integer

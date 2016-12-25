@@ -158,6 +158,7 @@ local function current_handshake(r, socket_inst, auth_key, user)
     return nil, errors.ReQLDriverError(r, err .. ': encoding SCRAM challenge')
   end
 
+  local dtype = 'sha256'
 
   -- wait for the second server challenge
   -- this is always a json document
@@ -200,17 +201,17 @@ local function current_handshake(r, socket_inst, auth_key, user)
   local salt = r.unb64(authentication.s)
 
   -- SaltedPassword := Hi(Normalize(password), salt, i)
-  local salted_password, str_err = pbkdf2('sha256', auth_key, salt, authentication.i, 32)
+  local salted_password, str_err = pbkdf2(dtype, auth_key, salt, authentication.i, 32)
 
   if not salted_password then
     return nil, errors.ReQLDriverError(r, str_err)
   end
 
   -- ClientKey := HMAC(SaltedPassword, "Client Key")
-  local client_key = hmac.digest('sha256', 'Client Key', salted_password)
+  local client_key = hmac.digest.new('Client Key', dtype):final(salted_password)
 
   -- StoredKey := H(ClientKey)
-  local stored_key = digest.new('sha256'):final(client_key)
+  local stored_key = digest.new(dtype):final(client_key)
 
   -- AuthMessage := client-first-message-bare + "," +
   --                server-first-message + "," +
@@ -221,15 +222,15 @@ local function current_handshake(r, socket_inst, auth_key, user)
       client_final_message_without_proof}, ',')
 
   -- ClientSignature := HMAC(StoredKey, AuthMessage)
-  local client_signature = hmac.digest('sha256', auth_message, stored_key)
+  local client_signature = hmac.digest.new(auth_message, dtype):final(stored_key)
 
   local client_proof = bxor256(client_key, client_signature)
 
   -- ServerKey := HMAC(SaltedPassword, "Server Key")
-  local server_key = hmac.digest('sha256', 'Server Key', salted_password)
+  local server_key = hmac.digest.new('Server Key', dtype):final(salted_password)
 
   -- ServerSignature := HMAC(ServerKey, AuthMessage)
-  local server_signature = hmac.digest('sha256', auth_message, server_key)
+  local server_signature = hmac.digest.new(auth_message, dtype):final(server_key)
 
   -- send the third client message
   -- {
