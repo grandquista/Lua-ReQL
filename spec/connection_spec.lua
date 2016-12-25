@@ -25,6 +25,22 @@ describe('connection', function()
     end)
   end)
 
+  it('depreciated v0.3', function()
+    r.connect({proto_version = r.proto_V0_3}, function(err, c)
+      assert.is_nil(err)
+      assert.is_table(c)
+      assert.is_true(c.is_open())
+    end)
+  end)
+
+  it('depreciated v0.4', function()
+    r.connect({proto_version = r.proto_V0_4}, function(err, c)
+      assert.is_nil(err)
+      assert.is_table(c)
+      assert.is_true(c.is_open())
+    end)
+  end)
+
   it('refused', function()
     local conn, err = r.connect'172.0.0.254'
     assert.is_nil(conn)
