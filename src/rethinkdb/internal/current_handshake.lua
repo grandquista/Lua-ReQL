@@ -208,7 +208,7 @@ local function current_handshake(r, socket_inst, auth_key, user)
   end
 
   -- ClientKey := HMAC(SaltedPassword, "Client Key")
-  local client_key = hmac.digest.new('Client Key', dtype):final(salted_password)
+  local client_key = hmac.new('Client Key', dtype):final(salted_password)
 
   -- StoredKey := H(ClientKey)
   local stored_key = digest.new(dtype):final(client_key)
@@ -222,15 +222,15 @@ local function current_handshake(r, socket_inst, auth_key, user)
       client_final_message_without_proof}, ',')
 
   -- ClientSignature := HMAC(StoredKey, AuthMessage)
-  local client_signature = hmac.digest.new(auth_message, dtype):final(stored_key)
+  local client_signature = hmac.new(auth_message, dtype):final(stored_key)
 
   local client_proof = bxor256(client_key, client_signature)
 
   -- ServerKey := HMAC(SaltedPassword, "Server Key")
-  local server_key = hmac.digest.new('Server Key', dtype):final(salted_password)
+  local server_key = hmac.new('Server Key', dtype):final(salted_password)
 
   -- ServerSignature := HMAC(ServerKey, AuthMessage)
-  local server_signature = hmac.digest.new(auth_message, dtype):final(server_key)
+  local server_signature = hmac.new(auth_message, dtype):final(server_key)
 
   -- send the third client message
   -- {
