@@ -44,6 +44,7 @@ dependencies = {
   'lua >= 5.1, < 5.4',
   'luaossl == 20161214-0',
   'luasocket ~> 3.0',
+  'luasec ~> 0.6',
   'luajson ~> 1.3',
 }
 build = {
