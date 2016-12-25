@@ -34,10 +34,10 @@ describe('connection', function()
   end)
 
   it('bad password', function()
-    local conn, err = r.connect({password = '0xDEADBEEF'}, function(err, c)
-      return c, err
+    local err = r.connect({password = '0xDEADBEEF'}, function(err, c)
+      assert.is_nil(c)
+      return err
     end)
-    assert.is_nil(conn)
     assert.is_table(err)
     assert.is_table(err.ReQLDriverError)
     assert.is_table(err.ReQLAuthError)
