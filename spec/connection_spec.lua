@@ -67,7 +67,7 @@ describe('connection', function()
     assert.is_table(conn)
     assert.is_true(conn.is_open())
 
-    local users = r.db'rethinkdb'.table'users'
+    local users = r.reql.db'rethinkdb'.table'users'
 
     assert.is_table(users.insert{id = 'devops', password = key}.run(conn)).to_array()
     assert.is_table(users.insert{id = 'dev', password = key, iterations = 64}.run(conn)).to_array()
