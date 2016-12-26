@@ -73,7 +73,7 @@ describe('connection', function()
       assert.is_table(
         users.insert{
           {id = 'devops', password = key},
-          {id = 'dev', password = key, iterations = 4096}
+          {id = 'dev', password = {password = key, iterations = 64}}
         }.run(conn)).to_array())
 
     assert.is_true(assert.is_table(r.connect{user = 'devops', password = key}).is_open())
