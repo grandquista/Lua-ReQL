@@ -29,10 +29,10 @@ describe('pseudotype', function()
     local binary = 'Hello World'
     local query = assert.is_table(r.reql.binary(binary))
     local raw = assert.is_table(r.run(query).to_array())[1]
-    assert.is_equal('BINARY', raw['$reql_type$'])
-    assert.is_equal(binary, r.unb64(raw.data))
+    assert.are.equal('BINARY', raw['$reql_type$'])
+    assert.are.equal(binary, r.unb64(raw.data))
     local native = assert.is_table(query.run(r.c, {binary_format = 'native'}).to_array())[1]
-    assert.is_equal(binary, native)
+    assert.are.equal(binary, native)
   end)
 
   it('group', function()

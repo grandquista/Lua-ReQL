@@ -22,6 +22,7 @@ describe('connection', function()
     r.connect(function(err, c)
       assert.is_nil(err)
       assert.is_table(c)
+      assert.are.equal('connection', r.type(c))
     end)
   end)
 

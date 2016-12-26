@@ -14,6 +14,7 @@ describe('datum', function()
 
     function r.run(query, ...)
       assert.is_table(query, ...)
+      assert.are.equal('reql', r.type(query))
       return assert.is_table(query.run(query.r.c))
     end
 
