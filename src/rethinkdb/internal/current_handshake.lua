@@ -201,14 +201,16 @@ local function current_handshake(r, socket_inst, auth_key, user)
   local salt = r.unb64(authentication.s)
 
   -- SaltedPassword := Hi(Normalize(password), salt, i)
-  local salted_password, str_err = pbkdf2(dtype, auth_key, salt, authentication.i, 32)
+  local salted_password, str_err = pbkdf2(
+    dtype, auth_key, salt, authentication.i,
+    string.len(hmac.new('', dtype):final('')))
 
   if not salted_password then
     return nil, errors.ReQLDriverError(r, str_err)
   end
 
   -- ClientKey := HMAC(SaltedPassword, "Client Key")
-  local client_key = hmac.new('Client Key', dtype):final(salted_password)
+  local client_key = hmac.new(salted_password, dtype):final('Client Key')
 
   -- StoredKey := H(ClientKey)
   local stored_key = digest.new(dtype):final(client_key)
@@ -222,15 +224,16 @@ local function current_handshake(r, socket_inst, auth_key, user)
       client_final_message_without_proof}, ',')
 
   -- ClientSignature := HMAC(StoredKey, AuthMessage)
-  local client_signature = hmac.new(auth_message, dtype):final(stored_key)
+  local client_signature = hmac.new(stored_key, dtype):final(auth_message)
 
+  -- ClientProof := ClientKey XOR ClientSignature
   local client_proof = bxor256(client_key, client_signature)
 
   -- ServerKey := HMAC(SaltedPassword, "Server Key")
-  local server_key = hmac.new('Server Key', dtype):final(salted_password)
+  local server_key = hmac.new(salted_password, dtype):final('Server Key')
 
   -- ServerSignature := HMAC(ServerKey, AuthMessage)
-  local server_signature = hmac.new(auth_message, dtype):final(server_key)
+  local server_signature = hmac.new(server_key, dtype):final(auth_message)
 
   -- send the third client message
   -- {
