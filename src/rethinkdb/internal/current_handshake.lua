@@ -30,7 +30,7 @@ local bor = bits.bor
 local bxor = bits.bxor
 local rand_bytes = crypto.rand.bytes
 
-local unpack = _G.unpack or table.unpack
+local unpack = _G.unpack or table.unpack  -- luacheck: read globals table.unpack
 
 local function bxor256(u, t)
   local res = {}
