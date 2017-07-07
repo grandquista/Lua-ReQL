@@ -228,6 +228,8 @@ return {
     get_nearest = 168,
     polygon_sub = 171,
     minval = 180,
-    maxval = 181
+    maxval = 181,
+    set_write_hook = 189,
+    get_write_hook = 190
   }
 }
