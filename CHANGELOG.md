@@ -1,3 +1,7 @@
+# 1.0.4
+
+- Change source to https://github.com/RebirthDB/rebirthdb-lua
+
 # 1.0.3
 
 - Fix connection callbacks ignored on errors

@@ -1,12 +1,11 @@
-project = 'Lua-ReQL'
+project = 'RebirthDB-Lua'
 title = 'Lua-ReQL documentation'
-description = 'A Lua driver for RethinkDB.'
+description = 'A Lua driver for RebirthDB.'
 
 file = {
   'src',
   exclude = {
     'src/rethinkdb/internal/protodef.lua',
-    'src/rethinkdb/internal/semver.lua',
   }
 }
 format = 'discount'

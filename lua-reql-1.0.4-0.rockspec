@@ -1,13 +1,13 @@
 rockspec_format = '1.1'
 package = 'lua-reql'
-version = '1.0.3-0'
+version = '1.0.4-0'
 source = {
-  url = 'git://github.com/grandquista/Lua-ReQL',
-  branch = 'v1.0.3',
+  url = 'git://github.com/RebirthDB/rebirthdb-lua',
+  branch = 'v1.0.4',
 }
 description = {
   summary = 'A Lua driver for RethinkDB.',
-  detailed = [[
+  detailed = [===[
 # Lua-ReQL
 
 Rethinkdb driver in Lua
@@ -33,19 +33,20 @@ Rethinkdb driver in Lua
 ## Installing from source
 - `luarocks make`
 
-[![Build Status](https://travis-ci.org/grandquista/Lua-ReQL.svg?branch=master)](https://travis-ci.org/grandquista/Lua-ReQL)
+[![Build Status](https://travis-ci.org/RebirthDB/rebirthdb-lua.svg?branch=master)](https://travis-ci.org/RebirthDB/rebirthdb-lua)
 
-[![Coverage Status](https://coveralls.io/repos/github/grandquista/Lua-ReQL/badge.svg?branch=master)](https://coveralls.io/github/grandquista/Lua-ReQL?branch=master)
-  ]],
-  homepage = 'https://github.com/grandquista/Lua-ReQL/wiki',
+[![Coverage Status](https://coveralls.io/repos/github/RebirthDB/rebirthdb-lua/badge.svg?branch=master)](https://coveralls.io/github/RebirthDB/rebirthdb-lua?branch=master)
+  ]===],
+  homepage = 'https://github.com/RebirthDB/rebirthdb-lua/wiki',
   license = 'Apache',
 }
 dependencies = {
   'lua >= 5.1, < 5.4',
   'luacrypto ~> 0.3',
-  'luasocket ~> 3.0',
-  'luasec ~> 0.6',
   'luajson ~> 1.3',
+  'luasec ~> 0.6',
+  'luasocket ~> 3.0',
+  'semver ~> 1.2',
 }
 build = {
   type = 'builtin',
@@ -69,7 +70,6 @@ build = {
     ['rethinkdb.internal.protect'] = 'src/rethinkdb/internal/protect.lua',
     ['rethinkdb.internal.protocol'] = 'src/rethinkdb/internal/protocol.lua',
     ['rethinkdb.internal.protodef'] = 'src/rethinkdb/internal/protodef.lua',
-    ['rethinkdb.internal.semver'] = 'src/rethinkdb/internal/semver.lua',
     ['rethinkdb.internal.socket'] = 'src/rethinkdb/internal/socket.lua',
     ['rethinkdb.internal.utilities'] = 'src/rethinkdb/internal/utilities.lua',
   }
