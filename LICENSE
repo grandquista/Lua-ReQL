@@ -1,8 +1,8 @@
-RethinkDB Lua Driver
+RebirthDB Lua Driver
 
 Copyright 2010-2012 RethinkDB
 
-Copyright 2014-2016 Adam Grandquist
+Copyright 2014-2018 Adam Grandquist
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this product except in compliance with the License.

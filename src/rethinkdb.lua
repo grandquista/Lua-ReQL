@@ -19,7 +19,7 @@ local utilities = require'rethinkdb.internal.utilities'
 local reql = require'rethinkdb.reql'
 local rtype = require'rethinkdb.rtype'
 
-local v = require('rethinkdb.internal.semver')
+local v = require('semver')
 
 --- Creates an independent driver instance with the passed options.
 local function new(driver_options)
@@ -35,7 +35,7 @@ local function new(driver_options)
   r.proto_V1_0 = current_handshake
 
   --- The loaded luarocks version string as a semver.
-  r.version = v'1.0.3'
+  r.version = v'1.0.4'
   r._VERSION = r.version
 
   connection.init(r)
