@@ -5,7 +5,7 @@ local function reql_error_formatter(err)
   end
 end
 
-local version = require('rethinkdb.internal.semver')(string.match(_VERSION, '%d+%.%d+'))
+local version = require('semver')(string.match(_VERSION, '%d+%.%d+'))
 
 describe('control dkjson', function()
   local r

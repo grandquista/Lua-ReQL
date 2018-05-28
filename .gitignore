@@ -10,3 +10,5 @@ build
 # Testing
 rethinkdb_data/
 t/servroot/
+here
+ENV
