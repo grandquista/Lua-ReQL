@@ -17,13 +17,8 @@ stds.reql = {
 }
 std = 'min'
 exclude_files = {'here'}
-<<<<<<< HEAD
 files['spec'] = {
   max_line_length = false,
   std = '+busted'
 }
 files['src'] = {std = '+reql'}
-=======
-files['spec'] = {std = '+busted'}
-max_line_length = 140
->>>>>>> master
