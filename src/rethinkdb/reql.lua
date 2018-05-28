@@ -11,7 +11,7 @@
 local errors = require'rethinkdb.errors'
 local protodef = require'rethinkdb.internal.protodef'
 
-local unpack = _G.unpack or table.unpack
+local unpack = _G.unpack or table.unpack  -- luacheck: read globals table.unpack
 
 local Term = protodef.Term
 
