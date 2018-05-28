@@ -6,8 +6,10 @@
 
 local int_to_bytes = {}
 
-if not string.pack then
-  local unpack = _G.unpack or table.unpack
+local pack = string.pack  -- luacheck: read globals string.pack
+
+if not pack then
+  local unpack = _G.unpack or table.unpack  -- luacheck: read globals table.unpack
 
   function int_to_bytes.little(num, bytes)
     local res = {}
@@ -36,12 +38,12 @@ end
 
 function int_to_bytes.little(num, bytes)
   num = math.fmod(num, 2 ^ (8 * bytes))
-  return string.pack('!1<I' .. bytes, num)
+  return pack('!1<I' .. bytes, num)
 end
 
 function int_to_bytes.big(num, bytes)
   num = math.fmod(num, 2 ^ (8 * bytes))
-  return string.pack('!1>I' .. bytes, num)
+  return pack('!1>I' .. bytes, num)
 end
 
 return int_to_bytes

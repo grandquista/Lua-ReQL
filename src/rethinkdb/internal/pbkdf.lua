@@ -27,7 +27,7 @@ local crypto = require('crypto')
 
 local bxor = bits.bxor
 
-local unpack = _G.unpack or table.unpack
+local unpack = _G.unpack or table.unpack  -- luacheck: read globals table.unpack
 
 local function xor(t, U)
   for j=1, string.len(U) do

@@ -6,7 +6,9 @@
 
 local bytes_to_int = {}
 
-if not string.unpack then
+local unpack = string.unpack  -- luacheck: read globals string.unpack
+
+if not unpack then
   function bytes_to_int.little(str)
     local n = 0
     for k=1, string.len(str) do
@@ -28,11 +30,11 @@ if not string.unpack then
 end
 
 function bytes_to_int.little(str)
-  return (string.unpack('!1<I' .. string.len(str), str))
+  return (unpack('!1<I' .. string.len(str), str))
 end
 
 function bytes_to_int.big(str)
-  return (string.unpack('!1>I' .. string.len(str), str))
+  return (unpack('!1>I' .. string.len(str), str))
 end
 
 return bytes_to_int
