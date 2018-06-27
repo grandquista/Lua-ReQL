@@ -6,9 +6,15 @@ cache:
   directories:
     - here
 
+services:
+  - docker
+
 env:
   global:
-    - RDB_VER="2.3.5~0"
+    - |
+      RDB_TAG="latest"
+      LUA="lua 5.3"
+      LUA_PATH="lua53"
   matrix:
      - |
        LUA="lua 5.1"
@@ -17,15 +23,14 @@ env:
        LUA="lua 5.2"
        LUA_PATH="lua52"
      - |
-       LUA="lua 5.3"
-       LUA_PATH="lua53"
-       RDB_VER="2.3.4~0"
-     - |
        LUA="luajit 2.0"
        LUA_PATH="jit20"
      - |
        LUA="luajit 2.1"
        LUA_PATH="jit21"
+     - RDB_TAG="2.3.1"
+     - RDB_TAG="2.2.6"
+     - RDB_TAG="2.0.4"
 
 before_install:
   - pip install hererocks
@@ -41,10 +46,8 @@ install:
   - luarocks build reql-1.0.4-0.rockspec
 
 before_script:
-  - wget https://download.rethinkdb.com/apt/pool/precise/main/r/rethinkdb/rethinkdb_${RDB_VER}precise_amd64.deb
-  - ar x rethinkdb_${RDB_VER}precise_amd64.deb
-  - tar xvzf data.tar.gz
-  - ./usr/bin/rethinkdb --daemon
+  - docker pull rethinkdb:$RDB_TAG
+  - docker run -d -p 28015:28015 rethinkdb
   - luarocks install busted
   - luarocks install luacov-coveralls
 
