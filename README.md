@@ -1,6 +1,6 @@
 # RebirthDB-Lua
 
-RebirthDB driver in Lua
+ReQL driver for Lua
 [![Build Status](https://travis-ci.org/RebirthDB/rebirthdb-lua.svg?branch=master)](https://travis-ci.org/RebirthDB/rebirthdb-lua)
 [![Coverage Status](https://coveralls.io/repos/github/RebirthDB/rebirthdb-lua/badge.svg?branch=master)](https://coveralls.io/github/RebirthDB/rebirthdb-lua?branch=master)
 
